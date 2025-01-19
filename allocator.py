@@ -5,12 +5,12 @@ from datetime import timedelta
 from tensorScaling import TensorMinMaxScaler
 
 class WeightOptimizer():
-    def __init__(self,num_iter:int,lr:float,num_assets:int, risk_free:float,risk_free_period:timedelta):
+    def __init__(self,num_iter:int,lr:float,num_assets:int, risk_free:float,risk_free_period:timedelta, weight_decay=0.1):
         self.num_iter = num_iter
         self.risk_free = risk_free
         self.risk_free_period = risk_free_period
         self.weights = nn.Parameter(torch.rand(num_assets,requires_grad=True).softmax(0)) #init weights and set to values 0-1
-        self.optim = torch.optim.AdamW([self.weights],lr=lr, weight_decay=0.1,maximize=True)
+        self.optim = torch.optim.AdamW([self.weights],lr=lr, weight_decay=weight_decay,maximize=True)
         
         #data to scale optimization targets
         self.calmar_scaler = TensorMinMaxScaler(scaling_range=(0,1),input_range=(0,15))
