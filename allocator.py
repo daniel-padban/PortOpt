@@ -1,11 +1,10 @@
-from faulthandler import cancel_dump_traceback_later
 import torch
 import torch.nn as nn
 from datetime import timedelta
 from tensorScaling import TensorMinMaxScaler
 
 class WeightOptimizer():
-    def __init__(self,num_iter:int,lr:float,num_assets:int, risk_free:float,risk_free_period:timedelta, weight_decay=0.1):
+    def __init__(self, num_iter:int,lr:float,num_assets:int, risk_free:float,risk_free_period:timedelta, weight_decay=0.1): 
         self.num_iter = num_iter
         self.risk_free = risk_free
         self.risk_free_period = risk_free_period
@@ -115,7 +114,7 @@ class WeightOptimizer():
         return cos, portfolio_daily_return
 
     
-    def optimize_weights(self,alpha,beta,gamma, returns):
+    def optimize_weights(self,returns, alpha=0.3,beta=0.1,gamma=0.6):
 
         '''
         :param alpha: weight of calmar ratio in optimization goal
@@ -123,6 +122,7 @@ class WeightOptimizer():
         :param gamma: weight of sortino ratio in optimization goal
         '''
         print('Optimizing weights... ')
+        returns = torch.tensor(returns.values,dtype=self.weights.dtype)
         cos_losses = []
         pf_returns = []
         for i in range(self.num_iter):
@@ -133,9 +133,9 @@ class WeightOptimizer():
             self.optim.step()
             cos_losses.append(cos_loss)
             pf_returns.append(pf_return)
-        cos_losses_tensor = torch.vstack(cos_losses)
-        pf_daily_returns = torch.vstack(pf_returns)
-        return cos_losses_tensor, pf_daily_returns
+        self.cos_losses_tensor = torch.vstack(cos_losses)
+        self.pf_daily_returns = torch.vstack(pf_returns)
+        return self.alloc_weights.numpy(force=True)
     
     def lstm_optimize(self, alpha, beta, gamma, returns, avg_return):
         cos_losses = []

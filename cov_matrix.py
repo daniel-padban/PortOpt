@@ -1,7 +1,4 @@
-from audioop import avg
 from datetime import date, timedelta
-from socket import PF_SYSTEM
-from turtle import down
 import torch
 import torch.nn as nn
 import yfinance as yf
@@ -12,7 +9,8 @@ from JSONReader import read_json
 class MPTCovMat():
     def __init__(self, tickers:yf.Tickers,start:date,end:date):
         self.ticker_list = tickers
-        self.price_df:pd.DataFrame = tickers.history(start=start,end=end,auto_adjust=True)
+        self.price_df:pd.DataFrame = self.ticker_list.download(start=start,end=end,auto_adjust=True)
+        
         self.log_return_df:pd.DataFrame = self.calc_log_return()
         self.cov_matrix:pd.DataFrame = self.calc_cov_matrix()
         self.col_indices = {idx:col for idx, col in enumerate(self.log_return_df.columns)}
@@ -28,7 +26,9 @@ class MPTCovMat():
     
 if __name__ == '__main__':
     from allocator import WeightOptimizer
-    ticker_list =read_json('omxs30.json')
+    test_df = yf.Ticker('AAPL').history(start=date(2024,1,1),end=date(2025,1,1), auto_adjust=True)
+    test_df.head()
+    ticker_list =read_json('assets.json')
     tickers = yf.Tickers(ticker_list,)
     start = date(2022,1,1)
     end = date(2023,1,1)
