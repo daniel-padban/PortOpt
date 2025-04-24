@@ -57,15 +57,39 @@ class Evaluation(object):
 
         return log_returns
     
-    def _returns(self):
-        '''
-        Get data for the evaluation and lookback periods
-        '''
-        prices = self.tickers.history(start=self.start_eval, end=self.end_eval)['Close']
-        returns = self._prices2returns(prices)
-        
-        return returns
     
+    def _verify_no_return_leakage(self,price_df: pd.DataFrame, return_df: pd.DataFrame):
+        """
+        Checks if returns are forward-looking (which would cause data leakage).
+        Assumes returns are computed as price[t] / price[t-1] - 1.
+        """
+        computed_returns = np.log(price_df / price_df.shift(1)).dropna()
+
+        # Align both to common index and columns
+        common_index = computed_returns.index.intersection(return_df.index)
+        common_columns = computed_returns.columns.intersection(return_df.columns)
+
+        aligned_computed = computed_returns.loc[common_index, common_columns]
+        aligned_return_df = return_df.loc[common_index, common_columns]
+
+        diff = (aligned_computed - aligned_return_df).abs()
+
+        if (diff < 1e-8).all().all():
+            print("✅ Return series is backward-looking — no leakage.")
+        else:
+            print("❌ Return series mismatch — possible forward-looking leakage.")
+    
+    def _returns(self):
+            '''
+            Get data for the evaluation and lookback periods
+            '''
+            prices = self.tickers.history(start=self.start_eval, end=self.end_eval)['Close']
+            returns = self._prices2returns(prices)
+            
+            self._verify_no_return_leakage(prices, returns)
+
+            return returns
+
     def _optimize_weights(self, returns, **algo_kwargs):
         '''
         Optimizes asset weights
@@ -83,24 +107,32 @@ class Evaluation(object):
 
         return weights
 
+
     def compare_returns(self, **algo_kwargs):
         '''
         Evaluates the algo on the test data.
 
+        :param cost_rate: transaction cost rate
+        :param **algo_kwargs: keyword arguments for the algorithm
         :return optimized_returns: optimized returns 
         :return comp_returns: comparison returns
         '''
+
         all_returns = self._returns()
         evals = []
         periods = self._periodize()
         for period in periods:
             period_returns = all_returns.loc[period[0][0]:period[0][1]]
-            weights = self._optimize_weights(period_returns,**algo_kwargs)
+            weights:np.ndarray = self._optimize_weights(period_returns,**algo_kwargs)
             eval_returns = all_returns.loc[period[1][0]:period[1][1]] @ weights
+
             evals.append(eval_returns)
+
         optimized_returns = pd.concat(evals)
 
         comp_returns = all_returns.loc[periods[0][1][0]:periods[-1][1][1]].mean(axis=1)
+
+        self.final_weights = weights
 
         return optimized_returns, comp_returns
 
@@ -117,5 +149,8 @@ if __name__ == '__main__':
     allocator = WeightOptimizer(10000,1e-3,2,0.025,timedelta(365),0.1)
     evaluator = Evaluation(allocator.optimize_weights, tickers, start, end, lookback, eval_period)
 
-    opt_returns, comp_returns = evaluator.compare_returns(alpha=0.3, beta=0.1, gamma=0.6)
+    evaluator._returns()
+
+    # Assuming the algorithm is a callable that takes returns and returns optimized weights
+    opt_returns, comp_returns = evaluator.compare_returns(calmar_co=0.3, omega_co=0.1, sortino_co=0.6)
     opt_returns.head()

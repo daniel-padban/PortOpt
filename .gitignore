@@ -2,3 +2,6 @@ __pycache__/
 portopt-venv/
 weights.csv
 allocator.py
+eval_weights.py
+demo_2.ipynb
+cost_evaluation.py
